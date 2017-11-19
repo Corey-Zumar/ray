@@ -150,7 +150,9 @@ class Runner(object):
 
         print(self.sess.run(tf.report_uninitialized_variables()))
 
-        self.sess.run(tf.global_variables_initializer())
+        self.sess.run(tf.variables_initializer(
+    [v for v in tf.global_variables() if v.name.split(':')[0] in set(sess.run(tf.report_uninitialized_variables()))
+]))
 
     def load_data(self, trajectories, full_trace):
         if self.config["use_gae"]:
