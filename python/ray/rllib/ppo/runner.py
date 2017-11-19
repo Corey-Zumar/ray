@@ -148,10 +148,8 @@ class Runner(object):
                             str(config["observation_filter"]))
         self.reward_filter = NoFilter()
 
-        print(self.sess.run(tf.report_uninitialized_variables()))
-
         self.sess.run(tf.variables_initializer(
-    [v for v in tf.global_variables() if v.name.split(':')[0] in set(sess.run(tf.report_uninitialized_variables()))
+    [v for v in tf.global_variables() if v.name.split(':')[0] in set(self.sess.run(tf.report_uninitialized_variables()))
 ]))
 
     def load_data(self, trajectories, full_trace):
