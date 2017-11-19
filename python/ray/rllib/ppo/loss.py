@@ -23,9 +23,7 @@ class ProximalPolicyLoss(object):
         self.observations = observations
 
         if model_creator:
-            mod = model_creator(observations, logit_dim)
-            self.curr_dists = mod.distances
-            self.curr_logits = mod.outputs
+            self.curr_logits = model_creator(observations, logit_dim).outputs
         else:
             self.curr_logits = ModelCatalog.get_model(
                 observations, logit_dim, config["model"]).outputs
@@ -74,8 +72,8 @@ class ProximalPolicyLoss(object):
         else:
             self.mean_vf_loss = tf.constant(0.0)
             self.loss = tf.reduce_mean(
-                kl_coeff * self.kl -
                 -self.surr +
+                kl_coeff * self.kl -
                 config["entropy_coeff"] * self.entropy)
 
         self.sess = sess
@@ -88,9 +86,8 @@ class ProximalPolicyLoss(object):
                 self.sampler, self.curr_logits, tf.constant("NA")]
 
     def compute(self, observations):
-        results, distances = self.sess.run([self.curr_logits, self.curr_dists], feed_dict={self.observations : observations})
-        print(distances)
-        return results
+        return self.sess.run(self.policy_results,
+                             feed_dict={self.observations: observations})
 
     def loss(self):
         return self.loss
