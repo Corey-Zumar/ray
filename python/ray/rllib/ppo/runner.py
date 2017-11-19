@@ -147,8 +147,10 @@ class Runner(object):
             raise Exception("Unknown observation_filter: " +
                             str(config["observation_filter"]))
         self.reward_filter = NoFilter()
-        self.sess.run(self.variables.initializer)
 
+        print(self.sess.run(tf.report_uninitiailized_variables()))
+
+        self.sess.run(tf.global_variables_initializer())
 
     def load_data(self, trajectories, full_trace):
         if self.config["use_gae"]:
