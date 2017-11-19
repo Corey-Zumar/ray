@@ -148,7 +148,7 @@ class Runner(object):
                             str(config["observation_filter"]))
         self.reward_filter = NoFilter()
 
-        print(self.sess.run(tf.report_uninitiailized_variables()))
+        print(self.sess.run(tf.report_uninitialized_variables()))
 
         self.sess.run(tf.global_variables_initializer())
 
