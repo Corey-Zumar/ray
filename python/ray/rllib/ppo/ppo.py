@@ -121,6 +121,9 @@ class PPOAgent(Agent):
 
         print("===> iteration", self.iteration)
 
+        if self.iteration == 0:
+            model.model.pretrain()
+
         iter_start = time.time()
         weights = ray.put(model.get_weights())
         [a.load_weights.remote(weights) for a in agents]

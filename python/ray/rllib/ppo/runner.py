@@ -98,9 +98,11 @@ class Runner(object):
             self.batch_size = config["sgd_batchsize"]
             self.per_device_batch_size = int(self.batch_size / len(devices))
 
+        self.model = model_creator(obs, self.logit_dim)
+
         def build_loss(obs, rets, advs, acts, plog, pvf_preds):
             return ProximalPolicyLoss(
-                model_creator,
+                self.model,
                 self.env.observation_space, self.env.action_space,
                 obs, rets, advs, acts, plog, pvf_preds, self.logit_dim,
                 self.kl_coeff, self.distribution_class, self.config,
@@ -148,11 +150,7 @@ class Runner(object):
                             str(config["observation_filter"]))
         self.reward_filter = NoFilter()
 
-        weights = self.variables.get_weights()
-
         self.sess.run(tf.global_variables_initializer())
-
-        #self.variables.set_weights(weights)
 
     def load_data(self, trajectories, full_trace):
         if self.config["use_gae"]:
