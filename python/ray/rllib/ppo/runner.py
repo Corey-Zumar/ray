@@ -98,11 +98,9 @@ class Runner(object):
             self.batch_size = config["sgd_batchsize"]
             self.per_device_batch_size = int(self.batch_size / len(devices))
 
-        self.model = model_creator(obs, self.logit_dim)
-
         def build_loss(obs, rets, advs, acts, plog, pvf_preds):
             return ProximalPolicyLoss(
-                self.model,
+                model_creator,
                 self.env.observation_space, self.env.action_space,
                 obs, rets, advs, acts, plog, pvf_preds, self.logit_dim,
                 self.kl_coeff, self.distribution_class, self.config,
@@ -116,6 +114,8 @@ class Runner(object):
             self.per_device_batch_size,
             build_loss,
             self.logdir)
+
+        self.model = self.par_opt._shared_loss.model
 
         # Metric ops
         with tf.name_scope("test_outputs"):
