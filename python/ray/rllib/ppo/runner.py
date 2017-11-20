@@ -152,7 +152,7 @@ class Runner(object):
 
         self.sess.run(tf.global_variables_initializer())
 
-        self.variables.set_weights(weights)
+        #self.variables.set_weights(weights)
 
     def load_data(self, trajectories, full_trace):
         if self.config["use_gae"]:
