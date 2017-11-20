@@ -148,9 +148,11 @@ class Runner(object):
                             str(config["observation_filter"]))
         self.reward_filter = NoFilter()
 
-        self.sess.run(tf.variables_initializer(
-    [v for v in tf.global_variables() if v.name.split(':')[0] in set(self.sess.run(tf.report_uninitialized_variables()))
-]))
+        weights = self.variables.get_weights()
+
+        self.sess.run(tf.global_variables_initializer())
+
+        self.variables.set_weights(weights)
 
     def load_data(self, trajectories, full_trace):
         if self.config["use_gae"]:
