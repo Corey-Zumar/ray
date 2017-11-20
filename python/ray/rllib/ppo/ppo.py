@@ -122,7 +122,7 @@ class PPOAgent(Agent):
         print("===> iteration", self.iteration)
 
         if self.iteration == 0:
-            model.model.pretrain()
+            model.model.pretrain(model.sess)
 
         iter_start = time.time()
         weights = ray.put(model.get_weights())
