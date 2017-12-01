@@ -39,8 +39,7 @@ class Runner(object):
 
     def __init__(self, env_creator, model_creator, batchsize, config, logdir, is_remote):
         if is_remote:
-            os.environ["CUDA_VISIBLE_DEVICES"] = ""
-            devices = ["/cpu:0"]
+            devices = ["/gpu:0"]
         else:
             devices = config["devices"]
         self.devices = devices
