@@ -95,6 +95,7 @@ class PPOAgent(Agent):
     def _init(self):
         self.global_step = 0
         self.kl_coeff = self.config["kl_coeff"]
+        self.last_dist_loss = -1
         if self.config["model_creator_id"]:
             model_creator = ray.get(ray.local_scheduler.ObjectID(
                 base64.b64decode(self.config["model_creator_id"])))
@@ -237,6 +238,7 @@ class PPOAgent(Agent):
             "rollouts_time": rollouts_time,
             "shuffle_time": shuffle_time,
             "load_time": load_time,
+            "last_dist_loss": self.last_dist_loss,
             "sgd_time": sgd_time,
             "sample_throughput": len(trajectory["observations"]) / sgd_time
         }
@@ -283,7 +285,9 @@ class PPOAgent(Agent):
                 for (a, o) in zip(self.agents, extra_data[3])])
 
     def debug_dist_loss(self):
-        return self.model.model.debug_dist_loss(self.model.sess)
+        l = self.model.model.debug_dist_loss(self.model.sess)
+        self.last_dist_loss = l
+        return l
 
     def compute_action(self, observation):
         observation = self.model.observation_filter(observation, update=False)
