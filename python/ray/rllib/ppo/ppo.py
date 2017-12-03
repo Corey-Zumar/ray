@@ -282,6 +282,9 @@ class PPOAgent(Agent):
             a.restore.remote(o)
                 for (a, o) in zip(self.agents, extra_data[3])])
 
+    def debug_dist_loss(self):
+        return self.model.model.debug_dist_loss(self.model.sess)
+
     def compute_action(self, observation):
         observation = self.model.observation_filter(observation, update=False)
         return self.model.common_policy.compute([observation])[0][0]
