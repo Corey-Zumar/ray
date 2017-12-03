@@ -100,6 +100,7 @@ class PPOAgent(Agent):
                 base64.b64decode(self.config["model_creator_id"])))
         else:
             model_creator = None
+        print('PPOAgent, creating all Runners, config {}'.format(self.config))
         self.model = Runner(
             self.env_creator, model_creator, 1, self.config, self.logdir, False)
         self.agents = [

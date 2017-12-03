@@ -23,6 +23,7 @@ MODEL_CONFIGS = [
     "fcnet_hiddens",  # Number of hidden layers for fully connected net
     "free_log_std",  # Documented in ray.rllib.models.Model
     "channel_major",  # Pytorch conv requires images to be channel-major
+    "use_float16",  # convert float32 images to float16?
 ]
 
 

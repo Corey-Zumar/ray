@@ -17,8 +17,8 @@ from ray.rllib.models import ModelCatalog
 from ray.rllib.ppo.env import BatchedEnv
 from ray.rllib.ppo.loss import ProximalPolicyLoss
 from ray.rllib.ppo.filter import NoFilter, MeanStdFilter
-from ray.rllib.ppo.rollout import (
-    rollouts, add_return_values, add_advantage_values)
+from ray.rllib.ppo.rollout import (rollouts, add_return_values,
+                                   add_advantage_values)
 from ray.rllib.ppo.utils import flatten, concatenate
 
 # TODO(pcm): Make sure that both observation_filter and reward_filter
@@ -37,7 +37,8 @@ class Runner(object):
     network weights. When run as a remote agent, only this graph is used.
     """
 
-    def __init__(self, env_creator, model_creator, batchsize, config, logdir, is_remote):
+    def __init__(self, env_creator, model_creator, batchsize, config, logdir,
+                 is_remote):
         if is_remote:
             devices = ["/gpu:0"]
         else:
@@ -54,39 +55,42 @@ class Runner(object):
         self.sess = tf.Session(config=config_proto)
         if config["tf_debug_inf_or_nan"] and not is_remote:
             self.sess = tf_debug.LocalCLIDebugWrapperSession(self.sess)
-            self.sess.add_tensor_filter(
-                "has_inf_or_nan", tf_debug.has_inf_or_nan)
+            self.sess.add_tensor_filter("has_inf_or_nan",
+                                        tf_debug.has_inf_or_nan)
 
         # Defines the training inputs:
         # The coefficient of the KL penalty.
         self.kl_coeff = tf.placeholder(
             name="newkl", shape=(), dtype=tf.float32)
 
+        self.use_float16 = config["model"].get("use_float16", False)
+        print('PPO Runner use_float16 %s' % self.use_float16)
+
         # The input observations.
         self.observations = tf.placeholder(
-            tf.float32, shape=(None,) + self.preprocessor.shape)
+            tf.float32 if not self.use_float16 else tf.float16,
+            shape=(None, ) + self.preprocessor.shape)
         # Targets of the value function.
-        self.returns = tf.placeholder(tf.float32, shape=(None,))
+        self.returns = tf.placeholder(tf.float32, shape=(None, ))
         # Advantage values in the policy gradient estimator.
-        self.advantages = tf.placeholder(tf.float32, shape=(None,))
+        self.advantages = tf.placeholder(tf.float32, shape=(None, ))
 
         action_space = self.env.action_space
         if isinstance(action_space, gym.spaces.Box):
             self.actions = tf.placeholder(
                 tf.float32, shape=(None, action_space.shape[0]))
         elif isinstance(action_space, gym.spaces.Discrete):
-            self.actions = tf.placeholder(tf.int64, shape=(None,))
+            self.actions = tf.placeholder(tf.int64, shape=(None, ))
         else:
-            raise NotImplemented(
-                "action space" + str(type(action_space)) +
-                "currently not supported")
+            raise NotImplemented("action space" + str(type(action_space)) +
+                                 "currently not supported")
         self.distribution_class, self.logit_dim = ModelCatalog.get_action_dist(
             action_space)
         # Log probabilities from the policy before the policy update.
         self.prev_logits = tf.placeholder(
             tf.float32, shape=(None, self.logit_dim))
         # Value function predictions before the policy update.
-        self.prev_vf_preds = tf.placeholder(tf.float32, shape=(None,))
+        self.prev_vf_preds = tf.placeholder(tf.float32, shape=(None, ))
 
         assert config["sgd_batchsize"] % len(devices) == 0, \
             "Batch size must be evenly divisible by devices"
@@ -99,20 +103,17 @@ class Runner(object):
 
         def build_loss(obs, rets, advs, acts, plog, pvf_preds):
             return ProximalPolicyLoss(
-                model_creator,
-                self.env.observation_space, self.env.action_space,
-                obs, rets, advs, acts, plog, pvf_preds, self.logit_dim,
-                self.kl_coeff, self.distribution_class, self.config,
-                self.sess)
+                model_creator, self.env.observation_space,
+                self.env.action_space, obs, rets, advs, acts, plog, pvf_preds,
+                self.logit_dim, self.kl_coeff, self.distribution_class,
+                self.config, self.sess)
 
         self.par_opt = LocalSyncParallelOptimizer(
-            tf.train.AdamOptimizer(self.config["sgd_stepsize"]),
-            self.devices,
-            [self.observations, self.returns, self.advantages,
-             self.actions, self.prev_logits, self.prev_vf_preds],
-            self.per_device_batch_size,
-            build_loss,
-            self.logdir)
+            tf.train.AdamOptimizer(self.config["sgd_stepsize"]), self.devices,
+            [
+                self.observations, self.returns, self.advantages, self.actions,
+                self.prev_logits, self.prev_vf_preds
+            ], self.per_device_batch_size, build_loss, self.logdir)
 
         self.model = self.par_opt._shared_loss.model
 
@@ -120,20 +121,19 @@ class Runner(object):
         with tf.name_scope("test_outputs"):
             policies = self.par_opt.get_device_losses()
             self.mean_loss = tf.reduce_mean(
-                tf.stack(values=[
-                    policy.loss for policy in policies]), 0)
+                tf.stack(values=[policy.loss for policy in policies]), 0)
             self.mean_policy_loss = tf.reduce_mean(
-                tf.stack(values=[
-                    policy.mean_policy_loss for policy in policies]), 0)
+                tf.stack(
+                    values=[policy.mean_policy_loss for policy in policies]),
+                0)
             self.mean_vf_loss = tf.reduce_mean(
-                tf.stack(values=[
-                    policy.mean_vf_loss for policy in policies]), 0)
+                tf.stack(values=[policy.mean_vf_loss for policy in policies]),
+                0)
             self.mean_kl = tf.reduce_mean(
-                tf.stack(values=[
-                    policy.mean_kl for policy in policies]), 0)
+                tf.stack(values=[policy.mean_kl for policy in policies]), 0)
             self.mean_entropy = tf.reduce_mean(
-                tf.stack(values=[
-                    policy.mean_entropy for policy in policies]), 0)
+                tf.stack(values=[policy.mean_entropy for policy in policies]),
+                0)
 
         # References to the model weights
         self.common_policy = self.par_opt.get_common_loss()
@@ -145,8 +145,8 @@ class Runner(object):
         elif config["observation_filter"] == "NoFilter":
             self.observation_filter = NoFilter()
         else:
-            raise Exception("Unknown observation_filter: " +
-                            str(config["observation_filter"]))
+            raise Exception("Unknown observation_filter: " + str(
+                config["observation_filter"]))
         self.reward_filter = NoFilter()
 
         self.sess.run(tf.global_variables_initializer())
@@ -154,34 +154,33 @@ class Runner(object):
     def load_data(self, trajectories, full_trace):
         if self.config["use_gae"]:
             return self.par_opt.load_data(
-                self.sess,
-                [trajectories["observations"],
-                 trajectories["td_lambda_returns"],
-                 trajectories["advantages"],
-                 trajectories["actions"].squeeze(),
-                 trajectories["logprobs"],
-                 trajectories["vf_preds"]],
+                self.sess, [
+                    trajectories["observations"],
+                    trajectories["td_lambda_returns"],
+                    trajectories["advantages"],
+                    trajectories["actions"].squeeze(),
+                    trajectories["logprobs"], trajectories["vf_preds"]
+                ],
                 full_trace=full_trace)
         else:
-            dummy = np.zeros((trajectories["observations"].shape[0],))
+            dummy = np.zeros((trajectories["observations"].shape[0], ))
             return self.par_opt.load_data(
-                self.sess,
-                [trajectories["observations"],
-                 dummy,
-                 trajectories["returns"],
-                 trajectories["actions"].squeeze(),
-                 trajectories["logprobs"],
-                 dummy],
+                self.sess, [
+                    trajectories["observations"], dummy,
+                    trajectories["returns"], trajectories["actions"].squeeze(),
+                    trajectories["logprobs"], dummy
+                ],
                 full_trace=full_trace)
 
-    def run_sgd_minibatch(
-            self, batch_index, kl_coeff, full_trace, file_writer):
+    def run_sgd_minibatch(self, batch_index, kl_coeff, full_trace,
+                          file_writer):
         return self.par_opt.optimize(
             self.sess,
             batch_index,
             extra_ops=[
                 self.mean_loss, self.mean_policy_loss, self.mean_vf_loss,
-                self.mean_kl, self.mean_entropy],
+                self.mean_kl, self.mean_entropy
+            ],
             extra_feed_dict={self.kl_coeff: kl_coeff},
             file_writer=file_writer if full_trace else None)
 
@@ -201,18 +200,16 @@ class Runner(object):
 
     def compute_trajectory(self, gamma, lam, horizon):
         """Compute a single rollout on the agent and return."""
-        trajectory = rollouts(
-            self.common_policy,
-            self.env, horizon, self.observation_filter, self.reward_filter)
+        trajectory = rollouts(self.common_policy, self.env, horizon,
+                              self.observation_filter, self.reward_filter)
         if self.config["use_gae"]:
             add_advantage_values(trajectory, gamma, lam, self.reward_filter)
         else:
             add_return_values(trajectory, gamma, self.reward_filter)
         return trajectory
 
-    def compute_steps(
-            self, gamma, lam, horizon, min_steps_per_task,
-            observation_filter, reward_filter):
+    def compute_steps(self, gamma, lam, horizon, min_steps_per_task,
+                      observation_filter, reward_filter):
         """Compute multiple rollouts and concatenate the results.
 
         Args:
@@ -241,8 +238,7 @@ class Runner(object):
         trajectory_lengths = []
         while True:
             trajectory = self.compute_trajectory(gamma, lam, horizon)
-            total_rewards.append(
-                trajectory["raw_rewards"].sum(axis=0).mean())
+            total_rewards.append(trajectory["raw_rewards"].sum(axis=0).mean())
             trajectory_lengths.append(
                 np.logical_not(trajectory["dones"]).sum(axis=0).mean())
             trajectory = flatten(trajectory)
@@ -251,18 +247,16 @@ class Runner(object):
             # trajectories are batched and cut only if all the trajectories
             # in the batch terminated, so we can potentially get rid of
             # some of the states here.
-            trajectory = {key: val[not_done]
-                          for key, val in trajectory.items()}
+            trajectory = {
+                key: val[not_done]
+                for key, val in trajectory.items()
+            }
             num_steps_so_far += trajectory["raw_rewards"].shape[0]
             trajectories.append(trajectory)
             if num_steps_so_far >= min_steps_per_task:
                 break
-        return (
-            concatenate(trajectories),
-            total_rewards,
-            trajectory_lengths,
-            self.observation_filter,
-            self.reward_filter)
+        return (concatenate(trajectories), total_rewards, trajectory_lengths,
+                self.observation_filter, self.reward_filter)
 
 
 RemoteRunner = ray.remote(Runner)
