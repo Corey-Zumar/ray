@@ -38,13 +38,8 @@ class VisionNetwork(Model):
                     weights_initializer=normc_initializer(1.0),
                     activation_fn=tf.nn.tanh, scope="fc2_aug")
                 fc2_aug = tf.concat([fc2, extra], axis=1)
-                fc3 = slim.fully_connected(
-                    fc2_aug, num_outputs,
-                    weights_initializer=normc_initializer(1.0),
-                    activation_fn=tf.nn.tanh, scope="fc3_aug")
-                fc3_aug = tf.concat([fc3, extra], axis=1)
                 out = slim.fully_connected(
-                    fc3_aug, num_outputs,
+                    fc2_aug, num_outputs,
                     weights_initializer=normc_initializer(0.01),
                     activation_fn=None, scope="fc_out_aug")
             return out, tf.squeeze(fc1, [1, 2])
